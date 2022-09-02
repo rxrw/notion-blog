@@ -14,10 +14,12 @@ type BlogConfig struct {
 	PropertyTags        string `usage:"Tags multi-select porperty name in Notion."`
 	PropertyCategories  string `usage:"Categories multi-select porperty name in Notion."`
 
+	CategoryMap map[string]string `usage:"Map of categories in Notion to categories in Hugo."`
+
 	FilterProp     string   `usage:"Property of the filter to apply to a select value of the articles."`
 	FilterValue    []string `usage:"Value of the filter to apply to the Notion articles database."`
 	PublishedValue string   `usage:"Value to which the filter property will be set after generating the content."`
 
-    UseDateForFilename bool `usage:"Use the creation date to generate the post filename."`
-	UseShortcodes bool `usage:"True if you want to generate shortcodes for unimplemented markdown blocks, such as callout or quote."`
+	UseDateForFilename bool `usage:"Use the creation date to generate the post filename."`
+	UseShortcodes      bool `usage:"True if you want to generate shortcodes for unimplemented markdown blocks, such as callout or quote."`
 }

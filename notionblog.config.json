@@ -1,14 +1,18 @@
 {
-	"databaseID": "9338ce6af74241259bdb230a9da697cc",
-	"imagesLink": "/images/posts",
-	"imagesFolder": "../personal-blog/static/images/posts",
-	"contentFolder": "../personal-blog/content/blog",
-	"archetypeFile": "../personal-blog/archetypes/blog.md",
-	"propertyDescription": "Description",
-	"propertyTags": "Tags",
-	"propertyCategories": "Categories",
-	"filterProp": "Status",
-	"filterValue": ["Finished ✅","Published 🖨"],
-	"publishedValue": "Published 🖨",
-	"useShortcodes": true
+    "databaseID": "",
+    "imagesLink": "/images/posts",
+    "imagesFolder": "static/images/",
+    "contentFolder": "content/zh",
+    "archetypeFile": "archetypes/notion.md",
+    "propertyDescription": "Description",
+    "propertyTags": "Tags",
+    "propertyCategories": "Category",
+    "categoryMap": "{\"技术\":\"tech\",\"EMO\":\"hope\",\"随笔\":\"essay\",\"旅行\":\"travel\"}",
+    "filterProp": "Status",
+    "filterValue": [
+        "Finished ✅",
+        "Published 🖨"
+    ],
+    "publishedValue": "Published 🖨",
+    "useShortcodes": true
 }

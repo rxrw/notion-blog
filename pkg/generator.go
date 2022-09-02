@@ -80,18 +80,15 @@ func getImage(imgURL string, config BlogConfig) (_ string, err error) {
 	}
 
 	// Get file name
-	filePath := splittedURL.Path
-	filePath = filePath[strings.LastIndex(filePath, "/")+1:]
-
-	name := fmt.Sprintf("%s_%s", splittedURL.Hostname(), filePath)
+	name := splittedURL.Path
 
 	spin := spinner.StartNew(fmt.Sprintf("Getting image `%s`", name))
 	defer func() {
 		spin.Stop()
 		if err != nil {
-			fmt.Println(fmt.Sprintf("❌ Getting image `%s`: %s", name, err))
+			fmt.Printf("❌ Getting image `%s`: %s", name, err)
 		} else {
-			fmt.Println(fmt.Sprintf("✔ Getting image `%s`: Completed", name))
+			fmt.Printf("✔ Getting image `%s`: Completed", name)
 		}
 	}()
 
@@ -129,8 +126,13 @@ func getImage(imgURL string, config BlogConfig) (_ string, err error) {
 }
 
 func Generate(w io.Writer, page notionapi.Page, blocks []notionapi.Block, config BlogConfig) error {
+
+	// Generate markdown content
+	buffer := &bytes.Buffer{}
+	GenerateContent(buffer, blocks, config)
+
 	// Parse template file
-	t := template.New(path.Base(config.ArchetypeFile)).Delims("[[", "]]")
+	t := template.New(path.Base(config.ArchetypeFile))
 	t.Funcs(template.FuncMap{
 		"add":    func(a, b int) int { return a + b },
 		"sub":    func(a, b int) int { return a - b },
@@ -145,18 +147,14 @@ func Generate(w io.Writer, page notionapi.Page, blocks []notionapi.Block, config
 		return fmt.Errorf("error parsing archetype file: %s", err)
 	}
 
-	// Generate markdown content
-	buffer := &bytes.Buffer{}
-	GenerateContent(buffer, blocks, config)
-
 	// Dump markdown content into output according to archetype file
 	fileArchetype := MakeArchetypeFields(page, config)
 	fileArchetype.Content = buffer.String()
+
 	err = t.Execute(w, fileArchetype)
 	if err != nil {
 		return fmt.Errorf("error filling archetype file: %s", err)
 	}
-
 	return nil
 }
 
@@ -181,14 +179,14 @@ func GenerateContent(w io.Writer, blocks []notionapi.Block, config BlogConfig, p
 
 		switch b := block.(type) {
 		case *notionapi.ParagraphBlock:
-			fprintln(w, prefixes, ConvertRichText(b.Paragraph.Text)+"\n")
+			fprintln(w, prefixes, ConvertRichText(b.Paragraph.RichText)+"\n")
 			GenerateContent(w, b.Paragraph.Children, config)
 		case *notionapi.Heading1Block:
-			fprintf(w, prefixes, "# %s", ConvertRichText(b.Heading1.Text))
+			fprintf(w, prefixes, "# %s", ConvertRichText(b.Heading1.RichText))
 		case *notionapi.Heading2Block:
-			fprintf(w, prefixes, "## %s", ConvertRichText(b.Heading2.Text))
+			fprintf(w, prefixes, "## %s", ConvertRichText(b.Heading2.RichText))
 		case *notionapi.Heading3Block:
-			fprintf(w, prefixes, "### %s", ConvertRichText(b.Heading3.Text))
+			fprintf(w, prefixes, "### %s", ConvertRichText(b.Heading3.RichText))
 		case *notionapi.CalloutBlock:
 			if !config.UseShortcodes {
 				continue
@@ -200,7 +198,7 @@ func GenerateContent(w io.Writer, blocks []notionapi.Block, config BlogConfig, p
 					fprintf(w, prefixes, `{{%% callout image="%s" %%}}`, b.Callout.Icon.GetURL())
 				}
 			}
-			fprintln(w, prefixes, ConvertRichText(b.Callout.Text))
+			fprintln(w, prefixes, ConvertRichText(b.Callout.RichText))
 			GenerateContent(w, b.Callout.Children, config, prefixes...)
 			fprintln(w, prefixes, "{{% /callout %}}")
 
@@ -226,25 +224,25 @@ func GenerateContent(w io.Writer, blocks []notionapi.Block, config BlogConfig, p
 			)
 
 		case *notionapi.QuoteBlock:
-			fprintf(w, prefixes, "> %s", ConvertRichText(b.Quote.Text))
+			fprintf(w, prefixes, "> %s", ConvertRichText(b.Quote.RichText))
 			GenerateContent(w, b.Quote.Children, config,
 				append([]string{"> "}, prefixes...)...)
 			fprintln(w, prefixes)
 
 		case *notionapi.BulletedListItemBlock:
 			bulletedList = true
-			fprintf(w, prefixes, "- %s", ConvertRichText(b.BulletedListItem.Text))
+			fprintf(w, prefixes, "- %s", ConvertRichText(b.BulletedListItem.RichText))
 			GenerateContent(w, b.BulletedListItem.Children, config,
 				append([]string{"    "}, prefixes...)...)
 
 		case *notionapi.NumberedListItemBlock:
 			numberedList = true
-			fprintf(w, prefixes, "1. %s", ConvertRichText(b.NumberedListItem.Text))
+			fprintf(w, prefixes, "1. %s", ConvertRichText(b.NumberedListItem.RichText))
 			GenerateContent(w, b.NumberedListItem.Children, config,
 				append([]string{"    "}, prefixes...)...)
 
 		case *notionapi.ImageBlock:
-			src, _ := getImage(b.Image.File.URL, config)
+			src, _ := getImage(b.Image.GetURL(), config)
 			fprintf(w, prefixes, "![%s](%s)\n", ConvertRichText(b.Image.Caption), src)
 
 		case *notionapi.CodeBlock:
@@ -253,9 +251,31 @@ func GenerateContent(w io.Writer, blocks []notionapi.Block, config BlogConfig, p
 			} else {
 				fprintf(w, prefixes, "```%s", b.Code.Language)
 			}
-			fprintln(w, prefixes, ConvertRichText(b.Code.Text))
+			fprintln(w, prefixes, ConvertRichText(b.Code.RichText))
 			fprintln(w, prefixes, "```")
 
+		case *notionapi.TableBlock:
+			rows := b.Table.Children
+			if len(rows) == 0 {
+				continue
+			}
+			headerLine := false
+			for index, row1 := range rows {
+				row := row1.(*notionapi.TableRowBlock)
+				if index == 1 && !headerLine {
+					fprintf(w, prefixes, "|%s", strings.Repeat("---|", len(row.TableRow.Cells)))
+					headerLine = true
+				} else {
+					cells := row.TableRow.Cells
+					line := ""
+					for _, cell := range cells {
+						line += fmt.Sprintf("|%s", ConvertRichText(cell))
+					}
+					line += "|"
+					fprintln(w, prefixes, line)
+				}
+			}
+			fprintln(w, prefixes)
 		case *notionapi.UnsupportedBlock:
 			if b.GetType() != "unsupported" {
 				fmt.Println("ℹ Unimplemented block", b.GetType())
@@ -265,5 +285,6 @@ func GenerateContent(w io.Writer, blocks []notionapi.Block, config BlogConfig, p
 		default:
 			fmt.Println("ℹ Unimplemented block", b.GetType())
 		}
+
 	}
 }

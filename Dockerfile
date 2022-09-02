@@ -1,11 +1,11 @@
-FROM golang:1.17-alpine
+FROM golang:1.19-alpine
 
 RUN apk add --no-cache git
 
-LABEL "com.github.actions.name"="notion-blog"
+LABEL "com.github.actions.name"="notion2md"
 LABEL "com.github.actions.description"="Notion blog articles database to hugo-style markdown."
-LABEL "repository"="https://github.com/xzebra/notion-blog"
-LABEL "maintainer"="xzebra <zebrv.apps@gmail.com>"
+LABEL "repository"="https://github.com/rxrw/notion2md"
+LABEL "maintainer"="Jens <rxrw@me.com>"
 
 WORKDIR /usr/src/app
 
@@ -18,6 +18,6 @@ RUN go mod download
 COPY . .
 
 # Build the Go app
-RUN go build -o ./bin/cli cmd/cli/main.go
+RUN go build -o ./bin/notion2md main.go
 
-ENTRYPOINT ["/usr/src/app/bin/cli"]
+ENTRYPOINT ["/usr/src/app/bin/notion2md"]

@@ -21,7 +21,7 @@ jobs:
       - name: notion-blog
         uses: xzebra/notion-blog@master
         with:
-          database-id: 'f887dfac795547ff97a81bb669b1052f'
+          database-id: ''
           content-folder: web/content
           images-folder: web/static/images/posts
           images-link: /images/posts
