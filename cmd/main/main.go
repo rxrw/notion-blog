@@ -29,5 +29,9 @@ func main() {
 
 	parseJSONConfig()
 
-	internal.ParseAndGenerate(config)
+	err = internal.ParseAndGenerate(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }

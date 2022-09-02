@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -15,12 +16,12 @@ import (
 	"github.com/jomei/notionapi"
 )
 
-func filterFromConfig(config notion_blog.BlogConfig) *notionapi.CompoundFilter {
+func filterFromConfig(config notion_blog.BlogConfig) *notionapi.OrCompoundFilter {
 	if config.FilterProp == "" || len(config.FilterValue) == 0 {
 		return nil
 	}
 
-	properties := make([]notionapi.PropertyFilter, len(config.FilterValue))
+	properties := make(notionapi.OrCompoundFilter, len(config.FilterValue))
 
 	for i, val := range config.FilterValue {
 		properties[i] = notionapi.PropertyFilter{
@@ -31,12 +32,11 @@ func filterFromConfig(config notion_blog.BlogConfig) *notionapi.CompoundFilter {
 		}
 	}
 
-	return &notionapi.CompoundFilter{
-		notionapi.FilterOperatorOR: properties,
-	}
+	return &properties
 }
 
 func generateArticleName(title string, date time.Time, config notion_blog.BlogConfig) string {
+
 	escapedTitle := strings.ReplaceAll(
 		strings.ToValidUTF8(
 			strings.ToLower(title),
@@ -47,9 +47,14 @@ func generateArticleName(title string, date time.Time, config notion_blog.BlogCo
 	escapedFilename := escapedTitle + ".md"
 
 	if config.UseDateForFilename {
-	    // Add date to the name to allow repeated titles
-	    return date.Format("2006-01-02") + escapedFilename
+		// Add date to the name to allow repeated titles
+		return date.Format("2006-01-02") + escapedFilename
 	}
+
+	if strings.Contains(escapedFilename, "_index") {
+		escapedFilename = "_index.md"
+	}
+
 	return escapedFilename
 }
 
@@ -118,6 +123,8 @@ func recursiveGetChildren(client *notionapi.Client, blockID notionapi.BlockID) (
 			b.BulletedListItem.Children, err = recursiveGetChildren(client, b.ID)
 		case *notionapi.NumberedListItemBlock:
 			b.NumberedListItem.Children, err = recursiveGetChildren(client, b.ID)
+		case *notionapi.TableBlock:
+			b.Table.Children, err = recursiveGetChildren(client, b.ID)
 		}
 
 		if err != nil {
@@ -134,8 +141,8 @@ func ParseAndGenerate(config notion_blog.BlogConfig) error {
 	spin := spinner.StartNew("Querying Notion database")
 	q, err := client.Database.Query(context.Background(), notionapi.DatabaseID(config.DatabaseID),
 		&notionapi.DatabaseQueryRequest{
-			CompoundFilter: filterFromConfig(config),
-			PageSize:       100,
+			Filter:   filterFromConfig(config),
+			PageSize: 100,
 		})
 	spin.Stop()
 	if err != nil {
@@ -151,8 +158,24 @@ func ParseAndGenerate(config notion_blog.BlogConfig) error {
 	// number of article status changed
 	changed := 0
 
+	configMap := make(map[string]string, 0)
+	err = json.Unmarshal([]byte(config.CategoryMap), &configMap)
+	if err != nil {
+		return fmt.Errorf("parsing config error: %s", err.Error())
+	}
+
 	for i, res := range q.Results {
 		title := notion_blog.ConvertRichText(res.Properties["Name"].(*notionapi.TitleProperty).Title)
+		categoryName := res.Properties["Category"].(*notionapi.SelectProperty).Select.Name
+		category := ""
+		if categoryName != "首页" && categoryName != "_index" {
+			category = strings.ToLower(configMap[categoryName])
+		}
+		// platformOptions := res.Properties["Platform"].(*notionapi.MultiSelectProperty).MultiSelect
+		// var platforms []string
+		// for _, option := range platformOptions {
+		// 	platforms = append(platforms, option.Name)
+		// }
 
 		fmt.Printf("-- Article [%d/%d] --\n", i+1, len(q.Results))
 		spin = spinner.StartNew("Getting blocks tree")
@@ -165,19 +188,29 @@ func ParseAndGenerate(config notion_blog.BlogConfig) error {
 		}
 		fmt.Println("✔ Getting blocks tree: Completed")
 
-		// Create file
-		f, _ := os.Create(filepath.Join(
-			config.ContentFolder,
+		folder := filepath.Join(config.ContentFolder, category)
+		err = os.MkdirAll(folder, 0777)
+
+		if err != nil {
+			log.Println("❌ Creating category folder:", err)
+			continue
+		}
+
+		filePath := filepath.Join(
+			folder,
 			generateArticleName(title, res.CreatedTime, config),
-		))
+		)
+
+		// Create file
+		f, _ := os.Create(filePath)
 
 		// Generate and dump content to file
 		if err := notion_blog.Generate(f, res, blocks, config); err != nil {
-			fmt.Println("❌ Generating blog post:", err)
+			fmt.Printf("❌ Generating blog %s: %s", res.URL, err)
 			f.Close()
 			continue
 		}
-		fmt.Println("✔ Generating blog post: Completed")
+		fmt.Printf("✔ Generating blog %s: Completed\n", title)
 
 		// Change status of blog post if desired
 		if changeStatus(client, res, config) {

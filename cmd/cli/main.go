@@ -34,5 +34,8 @@ func main() {
 
 	parseFlagsConfig()
 
-	internal.ParseAndGenerate(config)
+	err = internal.ParseAndGenerate(config)
+	if err != nil {
+		log.Println(err)
+	}
 }
