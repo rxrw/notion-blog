@@ -17,7 +17,7 @@ type OGMetadata struct {
 
 // parseMetadata returns the OpenGraph metadata of a page so we can generate a
 // bookmark.
-func parseMetadata(url string, config BlogConfig) (o *OGMetadata, err error) {
+func parseMetadata(url string, config TransferConfig) (o *OGMetadata, err error) {
 	// Create an empty metadata struct to not return nil
 	o = &OGMetadata{}
 

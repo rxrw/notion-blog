@@ -14,13 +14,9 @@ import (
 
 	"net/url"
 
-	"github.com/cjyzwg/markdown-wechat/draft"
-	"github.com/fastwego/offiaccount"
 	"github.com/janeczku/go-spinner"
 	"github.com/jomei/notionapi"
 )
-
-var App *offiaccount.OffiAccount
 
 func emphFormat(a *notionapi.Annotations) (s string) {
 	s = "%s"
@@ -76,7 +72,7 @@ func ConvertRichText(t []notionapi.RichText) string {
 	return buf.String()
 }
 
-func getImage(imgURL string, config BlogConfig) (_ string, err error) {
+func getImage(imgURL string, config TransferConfig) (_ string, err error) {
 	// Split image url to get host and file name
 	splittedURL, err := url.Parse(imgURL)
 	if err != nil {
@@ -124,8 +120,7 @@ func getImage(imgURL string, config BlogConfig) (_ string, err error) {
 	return filepath.Join(config.ImagesLink, name), err
 }
 
-// func Generate(w io.Writer, page notionapi.Page, blocks []notionapi.Block, config BlogConfig, platforms []string) error {
-func Generate(w io.Writer, page notionapi.Page, blocks []notionapi.Block, config BlogConfig) error {
+func Generate(w io.Writer, page notionapi.Page, blocks []notionapi.Block, config TransferConfig) error {
 
 	// Generate markdown content
 	buffer := &bytes.Buffer{}
@@ -158,30 +153,7 @@ func Generate(w io.Writer, page notionapi.Page, blocks []notionapi.Block, config
 	return nil
 }
 
-func OutputToWechatOfficialAccount(page notionapi.Page, filePath string) error {
-	config_file := &draft.ConfigFile{
-		MarkdownFilePath: filePath,
-		CssFilePath:      "assets/wechat.css",
-		ImagePath:        "assets/cover.jpeg",
-		Title:            ConvertRichText(page.Properties["Name"].(*notionapi.TitleProperty).Title),
-		Author:           page.CreatedBy.Name,
-	}
-	if App == nil {
-		oaConfig := offiaccount.Config{
-			Appid:  os.Getenv("WECHAT_APPID"),
-			Secret: os.Getenv("WECHAT_SECRET"),
-		}
-		App = offiaccount.New(oaConfig)
-	}
-	res, err := draft.DraftRun(config_file, App)
-	if err != nil {
-		return err
-	}
-	fmt.Println(res)
-	return nil
-}
-
-func GenerateContent(w io.Writer, blocks []notionapi.Block, config BlogConfig, prefixes ...string) {
+func GenerateContent(w io.Writer, blocks []notionapi.Block, config TransferConfig, prefixes ...string) {
 	if len(blocks) == 0 {
 		return
 	}

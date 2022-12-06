@@ -22,7 +22,7 @@ type ArchetypeFields struct {
 	Properties   notionapi.Properties
 }
 
-func MakeArchetypeFields(p notionapi.Page, config BlogConfig) ArchetypeFields {
+func MakeArchetypeFields(p notionapi.Page, config TransferConfig) ArchetypeFields {
 	title := ConvertRichText(p.Properties["Name"].(*notionapi.TitleProperty).Title)
 	title = strings.Replace(title, "_index", "", 1)
 	// Initialize first default Notion page fields

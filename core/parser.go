@@ -1,8 +1,7 @@
-package internal
+package core
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -10,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	notion_blog "notion-blog/pkg"
+	translator "notion2md/pkg"
 
 	"github.com/janeczku/go-spinner"
 	"github.com/jomei/notionapi"
 )
 
-func filterFromConfig(config notion_blog.BlogConfig) *notionapi.OrCompoundFilter {
+func filterFromConfig(config translator.TransferConfig) *notionapi.OrCompoundFilter {
 	if config.FilterProp == "" || len(config.FilterValue) == 0 {
 		return nil
 	}
@@ -26,7 +25,7 @@ func filterFromConfig(config notion_blog.BlogConfig) *notionapi.OrCompoundFilter
 	for i, val := range config.FilterValue {
 		properties[i] = notionapi.PropertyFilter{
 			Property: config.FilterProp,
-			Select: &notionapi.SelectFilterCondition{
+			Status: &notionapi.StatusFilterCondition{
 				Equals: val,
 			},
 		}
@@ -35,7 +34,7 @@ func filterFromConfig(config notion_blog.BlogConfig) *notionapi.OrCompoundFilter
 	return &properties
 }
 
-func generateArticleName(title string, date time.Time, config notion_blog.BlogConfig) string {
+func generateArticleName(title string, date time.Time, config translator.TransferConfig) string {
 
 	escapedTitle := strings.ReplaceAll(
 		strings.ToValidUTF8(
@@ -60,16 +59,16 @@ func generateArticleName(title string, date time.Time, config notion_blog.BlogCo
 
 // chageStatus changes the Notion article status to the published value if set.
 // It returns true if status changed.
-func changeStatus(client *notionapi.Client, p notionapi.Page, config notion_blog.BlogConfig) bool {
+func changeStatus(client *notionapi.Client, p notionapi.Page, config translator.TransferConfig) bool {
 	// No published value or filter prop to change
 	if config.FilterProp == "" || config.PublishedValue == "" {
 		return false
 	}
 
 	if v, ok := p.Properties[config.FilterProp]; ok {
-		if status, ok := v.(*notionapi.SelectProperty); ok {
+		if status, ok := v.(*notionapi.StatusProperty); ok {
 			// Already has published value
-			if status.Select.Name == config.PublishedValue {
+			if status.Status.Name == config.PublishedValue {
 				return false
 			}
 		} else { // Filter prop is not a select property
@@ -80,8 +79,8 @@ func changeStatus(client *notionapi.Client, p notionapi.Page, config notion_blog
 	}
 
 	updatedProps := make(notionapi.Properties)
-	updatedProps[config.FilterProp] = notionapi.SelectProperty{
-		Select: notionapi.Option{
+	updatedProps[config.FilterProp] = notionapi.StatusProperty{
+		Status: notionapi.Status{
 			Name: config.PublishedValue,
 		},
 	}
@@ -135,7 +134,7 @@ func recursiveGetChildren(client *notionapi.Client, blockID notionapi.BlockID) (
 	return
 }
 
-func ParseAndGenerate(config notion_blog.BlogConfig) error {
+func ParseAndGenerate(config translator.TransferConfig) error {
 	client := notionapi.NewClient(notionapi.Token(os.Getenv("NOTION_SECRET")))
 
 	spin := spinner.StartNew("Querying Notion database")
@@ -158,24 +157,18 @@ func ParseAndGenerate(config notion_blog.BlogConfig) error {
 	// number of article status changed
 	changed := 0
 
-	configMap := make(map[string]string, 0)
-	err = json.Unmarshal([]byte(config.CategoryMap), &configMap)
+	configMap := config.CategoryMap
 	if err != nil {
 		return fmt.Errorf("parsing config error: %s", err.Error())
 	}
 
 	for i, res := range q.Results {
-		title := notion_blog.ConvertRichText(res.Properties["Name"].(*notionapi.TitleProperty).Title)
+		title := translator.ConvertRichText(res.Properties["Name"].(*notionapi.TitleProperty).Title)
 		categoryName := res.Properties["Category"].(*notionapi.SelectProperty).Select.Name
 		category := ""
 		if categoryName != "首页" && categoryName != "_index" {
 			category = strings.ToLower(configMap[categoryName])
 		}
-		// platformOptions := res.Properties["Platform"].(*notionapi.MultiSelectProperty).MultiSelect
-		// var platforms []string
-		// for _, option := range platformOptions {
-		// 	platforms = append(platforms, option.Name)
-		// }
 
 		fmt.Printf("-- Article [%d/%d] --\n", i+1, len(q.Results))
 		spin = spinner.StartNew("Getting blocks tree")
@@ -205,7 +198,7 @@ func ParseAndGenerate(config notion_blog.BlogConfig) error {
 		f, _ := os.Create(filePath)
 
 		// Generate and dump content to file
-		if err := notion_blog.Generate(f, res, blocks, config); err != nil {
+		if err := translator.Generate(f, res, blocks, config); err != nil {
 			fmt.Printf("❌ Generating blog %s: %s", res.URL, err)
 			f.Close()
 			continue
