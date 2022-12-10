@@ -147,6 +147,7 @@ func Generate(w io.Writer, page notionapi.Page, blocks []notionapi.Block, config
 	fileArchetype.Content = buffer.String()
 
 	err = t.Execute(w, fileArchetype)
+	fmt.Println(fileArchetype)
 	if err != nil {
 		return fmt.Errorf("error filling archetype file: %s", err)
 	}

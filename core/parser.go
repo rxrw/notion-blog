@@ -82,6 +82,7 @@ func changeStatus(client *notionapi.Client, p notionapi.Page, config translator.
 	updatedProps[config.FilterProp] = notionapi.StatusProperty{
 		Status: notionapi.Status{
 			Name: config.PublishedValue,
+			ID: nil,
 		},
 	}
 
