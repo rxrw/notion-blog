@@ -2,7 +2,7 @@ module notion2md
 
 go 1.19
 
-// replace github.com/jomei/notionapi => ../notionapi
+replace github.com/jomei/notionapi => github.com/rxrw/notionapi v0.0.0-20221211042937-9a420879b5bf
 
 require (
 	github.com/itzg/go-flagsfiller v1.9.1

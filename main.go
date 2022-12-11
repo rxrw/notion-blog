@@ -16,11 +16,12 @@ import (
 var config translator.TransferConfig
 
 func parseJSONConfig() error {
-	wkspc := "."
-	if os.Getenv("GITHUB_WORKSPACE") == "" {
-		wkspc = os.Getenv("GITHUB_WORKSPACE")
+	pathSeparator := string(os.PathSeparator)
+	wkspc := "." + pathSeparator
+	if os.Getenv("GITHUB_WORKSPACE") != "" {
+		wkspc = os.Getenv("GITHUB_WORKSPACE") + pathSeparator
 	}
-	configPath := wkspc + "/notionblog.config.json"
+	configPath := wkspc + "notionblog.config.json"
 	log.Printf("Reading config from %s", configPath)
 	content, err := os.ReadFile(configPath)
 	if err != nil {
